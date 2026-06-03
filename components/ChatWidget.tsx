@@ -41,12 +41,17 @@ function ChatIcon() {
 }
 
 export default function ChatWidget() {
+  const MAX_USER_MESSAGES = 20
+
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [leadSaved, setLeadSaved] = useState(false)
   const [detectedLead, setDetectedLead] = useState<{ nombre?: string; telefono?: string }>({})
+
+  const userMessageCount = messages.filter((m) => m.role === 'user').length
+  const limitReached = userMessageCount >= MAX_USER_MESSAGES
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -231,29 +236,55 @@ export default function ChatWidget() {
             </div>
           )}
 
+          {/* Límite alcanzado */}
+          {limitReached && (
+            <div className="px-4 py-3 bg-amber-50 border-t border-amber-200 shrink-0">
+              <p className="text-xs text-amber-800 font-medium text-center">
+                Límite de consultas alcanzado.{' '}
+                {inmobiliariaId && (
+                  <a
+                    href={`https://wa.me/`}
+                    className="underline text-amber-900"
+                  >
+                    Contactanos por WhatsApp
+                  </a>
+                )}
+              </p>
+            </div>
+          )}
+
           {/* Input */}
-          <form
-            onSubmit={handleSubmit}
-            className="p-3 border-t border-crema-dark bg-white flex gap-2 shrink-0"
-          >
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Escribí tu consulta..."
-              className="flex-1 bg-crema border border-crema-dark rounded-full px-4 py-2 text-sm text-oscuro placeholder:text-oscuro/40 outline-none focus:border-dorado transition-colors"
-              disabled={isTyping}
-            />
-            <button
-              type="submit"
-              disabled={!input.trim() || isTyping}
-              className="w-9 h-9 bg-dorado rounded-full flex items-center justify-center shrink-0 disabled:opacity-40 hover:bg-dorado-light transition-all"
-              aria-label="Enviar"
+          {!limitReached && (
+            <form
+              onSubmit={handleSubmit}
+              className="p-3 border-t border-crema-dark bg-white flex gap-2 shrink-0"
             >
-              <SendIcon />
-            </button>
-          </form>
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Escribí tu consulta..."
+                className="flex-1 bg-crema border border-crema-dark rounded-full px-4 py-2 text-sm text-oscuro placeholder:text-oscuro/40 outline-none focus:border-dorado transition-colors"
+                disabled={isTyping}
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || isTyping}
+                className="w-9 h-9 bg-dorado rounded-full flex items-center justify-center shrink-0 disabled:opacity-40 hover:bg-dorado-light transition-all"
+                aria-label="Enviar"
+              >
+                <SendIcon />
+              </button>
+            </form>
+          )}
+
+          {/* Contador discreto */}
+          {!limitReached && userMessageCount >= 15 && (
+            <p className="text-center text-oscuro/30 text-xs pb-1 shrink-0">
+              {MAX_USER_MESSAGES - userMessageCount} consulta{MAX_USER_MESSAGES - userMessageCount !== 1 ? 's' : ''} restante{MAX_USER_MESSAGES - userMessageCount !== 1 ? 's' : ''}
+            </p>
+          )}
         </div>
       )}
     </>

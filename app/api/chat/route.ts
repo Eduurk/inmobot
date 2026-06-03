@@ -39,46 +39,45 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Verificar límite de 20 mensajes de usuario por sesión
+    const userMessageCount = messages.filter((m: { role: string }) => m.role === 'user').length
+    if (userMessageCount > 20) {
+      return NextResponse.json({
+        reply: `Alcanzaste el límite de consultas de esta sesión. Para continuar, contactanos directamente por WhatsApp al ${inmo.whatsapp || inmo.telefono || 'nuestro número'}.`,
+      })
+    }
+
+    // Contexto compacto: solo campos esenciales para minimizar tokens
     const propContexto =
       propiedades && propiedades.length > 0
         ? propiedades
-            .map(
-              (p) => `
-• ${p.titulo} | ${p.tipo.charAt(0).toUpperCase() + p.tipo.slice(1)} en ${p.operacion}
-  Precio: ${p.moneda} ${p.precio?.toLocaleString('es-AR') ?? 'Consultar'}${p.precio_periodo ? '/' + p.precio_periodo : ''}
-  Zona: ${p.zona || p.direccion || 'Sin especificar'}
-  ${p.metros_cuadrados ? p.metros_cuadrados + 'm²' : ''} ${p.ambientes ? '| ' + p.ambientes + ' amb.' : ''} ${p.dormitorios ? '| ' + p.dormitorios + ' dorm.' : ''} ${p.banos ? '| ' + p.banos + ' baños' : ''}
-  ${p.cochera ? '✓ Cochera ' : ''}${p.apto_credito ? '✓ Apto crédito' : ''}
-  ${p.descripcion ? p.descripcion.slice(0, 150) : ''}
-  ID: ${p.id}`
-            )
+            .map((p) => {
+              const precio = p.precio
+                ? `${p.moneda} ${p.precio.toLocaleString('es-AR')}${p.precio_periodo ? '/' + p.precio_periodo : ''}`
+                : 'Consultar'
+              const detalles = [
+                p.metros_cuadrados && `${p.metros_cuadrados}m²`,
+                p.ambientes && `${p.ambientes}amb`,
+                p.dormitorios && `${p.dormitorios}dorm`,
+                p.cochera && 'cochera',
+                p.apto_credito && 'crédito',
+              ].filter(Boolean).join(' ')
+              return `• ${p.titulo} | ${p.operacion} | ${precio} | ${p.zona || p.direccion || 'sin zona'} | ${detalles}`
+            })
             .join('\n')
-        : 'No hay propiedades cargadas en este momento.'
+        : 'Sin propiedades disponibles.'
 
-    const systemPrompt = `Sos ${inmo.chatbot_nombre || 'el asistente virtual'} de ${inmo.nombre}, una inmobiliaria de ${inmo.ciudad || 'Argentina'}.
-${inmo.chatbot_prompt_extra ? '\n' + inmo.chatbot_prompt_extra + '\n' : ''}
-PROPIEDADES DISPONIBLES HOY:
-${propContexto}
-
-DATOS DE CONTACTO:
-- WhatsApp: ${inmo.whatsapp || inmo.telefono || 'Consultar'}
-- Email: ${inmo.email || 'Consultar'}
-- Dirección: ${inmo.direccion || 'Consultar'}
-
-INSTRUCCIONES:
-- Hablá en español rioplatense (vos, hacés, tenés)
-- Respondé en máximo 3-4 oraciones, de forma clara y directa
-- Si el cliente pregunta por una propiedad específica, describila con sus características principales
-- Si el cliente quiere visitar una propiedad, pedile nombre y teléfono amablemente
-- Si la consulta es compleja o urgente, derivá al WhatsApp
-- Nunca inventes propiedades, precios ni datos que no estén en la lista de arriba
-- Sé cálido, profesional y conciso`
+    const systemPrompt = `Asistente de ${inmo.nombre} (${inmo.ciudad}). ${inmo.chatbot_prompt_extra || ''}
+PROPIEDADES: ${propContexto}
+CONTACTO: WA ${inmo.whatsapp || inmo.telefono} | ${inmo.email || ''}
+REGLAS: español rioplatense, máx 3 oraciones, pedí nombre+tel para visitas, derivá casos complejos al WA, no inventes datos.`
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 600,
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 350,
       system: systemPrompt,
-      messages: messages.slice(-10).map((m: { role: string; content: string }) => ({
+      // Solo últimos 6 mensajes para minimizar tokens de contexto
+      messages: messages.slice(-6).map((m: { role: string; content: string }) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
