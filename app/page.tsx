@@ -79,10 +79,18 @@ export default async function LandingPage() {
 
       {/* Hero */}
       <section className="relative bg-oscuro text-crema overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-dorado via-transparent to-transparent" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-dorado/30 rounded-full blur-3xl" />
-        </div>
+        {/* Video de fondo */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-40"
+          src="https://pikjjmsaqfckdxpnenja.supabase.co/storage/v1/object/public/fotos-propiedades/Hands_handing_over_house_keys_202606030827.mp4"
+        />
+        {/* Overlay degradado sobre el video */}
+        <div className="absolute inset-0 bg-gradient-to-r from-oscuro/95 via-oscuro/70 to-oscuro/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-oscuro/60 via-transparent to-transparent" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-32">
           <div className="max-w-3xl">
