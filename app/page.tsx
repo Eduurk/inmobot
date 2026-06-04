@@ -85,12 +85,12 @@ export default async function LandingPage() {
           muted
           loop
           playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-40"
+          className="absolute inset-0 w-full h-full object-cover opacity-70"
           src="https://pikjjmsaqfckdxpnenja.supabase.co/storage/v1/object/public/fotos-propiedades/Hands_handing_over_house_keys_202606030827.mp4"
         />
-        {/* Overlay degradado sobre el video */}
-        <div className="absolute inset-0 bg-gradient-to-r from-oscuro/95 via-oscuro/70 to-oscuro/40" />
-        <div className="absolute inset-0 bg-gradient-to-t from-oscuro/60 via-transparent to-transparent" />
+        {/* Overlay más liviano para que el video se vea */}
+        <div className="absolute inset-0 bg-gradient-to-r from-oscuro/80 via-oscuro/40 to-oscuro/10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-oscuro/40 via-transparent to-transparent" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-32">
           <div className="max-w-3xl">
