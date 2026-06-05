@@ -4,9 +4,60 @@ import { createServiceRoleClient } from '@/lib/supabase-server'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+type Msg = { role: string; content: string }
+
+function detectLead(messages: Msg[]) {
+  const phonePattern = /(?:\+?54\s?)?(?:11|(?:2|3)\d{2,3})[\s-]?\d{3,4}[\s-]?\d{4}/
+  const namePattern = /(?:me llamo|soy|mi nombre es|llamame)\s+([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,}(?:\s[A-Za-záéíóúüÜñÑ]{2,})?)/i
+  const genericNamePattern = /^([A-Z][a-záéíóúüñ]{2,}(?:\s[A-Z][a-záéíóúüñ]{2,})?)[\s,!.]*$/
+
+  let nombre: string | undefined
+  let telefono: string | undefined
+
+  for (const msg of messages.filter((m) => m.role === 'user')) {
+    const phoneMatch = msg.content.match(phonePattern)
+    const nameMatch = msg.content.match(namePattern) ?? msg.content.match(genericNamePattern)
+    if (phoneMatch) telefono = phoneMatch[0].replace(/\s/g, '')
+    if (nameMatch) nombre = (nameMatch[1] ?? nameMatch[0])?.trim()
+  }
+
+  return { nombre, telefono }
+}
+
+function extractQualification(messages: Msg[]) {
+  const text = messages
+    .filter((m) => m.role === 'user')
+    .map((m) => m.content)
+    .join(' ')
+    .toLowerCase()
+
+  let presupuesto: string | null = null
+  const budgetMatch = text.match(
+    /(?:presupuesto|hasta|tengo|cuento con)[^.]*?(\$?\s*\d[\d.,]*\s*(?:k|mil(?:lones?)?|m(?:illones?)?)?(?:\s*(?:pesos|dolares|dólares|usd))?)/i
+  )
+  if (budgetMatch) presupuesto = budgetMatch[1]?.trim().slice(0, 80) ?? null
+
+  let plazo: string | null = null
+  if (/urgente|ya mismo|inmediato|lo antes posible|cuanto antes/.test(text)) plazo = 'urgente'
+  else if (/\b\d+\s*meses?\b|corto plazo|pronto|este mes/.test(text)) plazo = '1-3 meses'
+  else if (/fin de año|largo plazo|explorando|mirando|no hay apuro|sin apuro/.test(text)) plazo = 'explorando'
+
+  let tipo_busqueda: string | null = null
+  if (/comprar|compra|adquirir/.test(text)) tipo_busqueda = 'compra'
+  else if (/temporada|verano|vacacion/.test(text)) tipo_busqueda = 'temporada'
+  else if (/alquil/.test(text)) tipo_busqueda = 'alquiler'
+
+  let necesita_financiacion: boolean | null = null
+  if (/crédito|hipotecario|financiación|financiamiento|préstamo|banco|cuotas/.test(text))
+    necesita_financiacion = true
+  else if (/contado|efectivo|no necesito crédito/.test(text)) necesita_financiacion = false
+
+  return { presupuesto, plazo, tipo_busqueda, necesita_financiacion }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { messages, inmobiliariaId } = await req.json()
+    const { messages, inmobiliariaId, sessionId } = await req.json()
 
     if (!inmobiliariaId) {
       return NextResponse.json({ error: 'inmobiliariaId requerido' }, { status: 400 })
@@ -15,11 +66,7 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceRoleClient()
 
     const [{ data: inmo }, { data: propiedades }] = await Promise.all([
-      supabase
-        .from('inmobiliaria')
-        .select('*')
-        .eq('id', inmobiliariaId)
-        .single(),
+      supabase.from('inmobiliaria').select('*').eq('id', inmobiliariaId).single(),
       supabase
         .from('propiedades')
         .select('*, fotos_propiedad(url, es_principal)')
@@ -39,15 +86,13 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Verificar límite de 20 mensajes de usuario por sesión
-    const userMessageCount = messages.filter((m: { role: string }) => m.role === 'user').length
+    const userMessageCount = messages.filter((m: Msg) => m.role === 'user').length
     if (userMessageCount > 20) {
       return NextResponse.json({
         reply: `Alcanzaste el límite de consultas de esta sesión. Para continuar, contactanos directamente por WhatsApp al ${inmo.whatsapp || inmo.telefono || 'nuestro número'}.`,
       })
     }
 
-    // Contexto compacto: solo campos esenciales para minimizar tokens
     const propContexto =
       propiedades && propiedades.length > 0
         ? propiedades
@@ -61,7 +106,9 @@ export async function POST(req: NextRequest) {
                 p.dormitorios && `${p.dormitorios}dorm`,
                 p.cochera && 'cochera',
                 p.apto_credito && 'crédito',
-              ].filter(Boolean).join(' ')
+              ]
+                .filter(Boolean)
+                .join(' ')
               return `• ${p.titulo} | ${p.operacion} | ${precio} | ${p.zona || p.direccion || 'sin zona'} | ${detalles}`
             })
             .join('\n')
@@ -70,28 +117,99 @@ export async function POST(req: NextRequest) {
     const systemPrompt = `Asistente de ${inmo.nombre} (${inmo.ciudad}). ${inmo.chatbot_prompt_extra || ''}
 PROPIEDADES: ${propContexto}
 CONTACTO: WA ${inmo.whatsapp || inmo.telefono} | ${inmo.email || ''}
-REGLAS: español rioplatense, máx 3 oraciones, pedí nombre+tel para visitas, derivá casos complejos al WA, no inventes datos.`
+REGLAS: español rioplatense, máx 3 oraciones, no inventes datos, derivá casos complejos al WA.
+CALIFICACIÓN: si el visitante muestra interés concreto, preguntá de a una por turno (de forma natural): presupuesto aproximado, plazo de búsqueda (urgente / 3-6 meses / explorando), si necesita crédito hipotecario. Si pide visita, pedí nombre y teléfono.`
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 350,
       system: systemPrompt,
-      // Solo últimos 6 mensajes para minimizar tokens de contexto
-      messages: messages.slice(-6).map((m: { role: string; content: string }) => ({
+      messages: messages.slice(-6).map((m: Msg) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
     })
 
-    const reply =
-      response.content[0].type === 'text' ? response.content[0].text : ''
+    const reply = response.content[0].type === 'text' ? response.content[0].text : ''
+
+    // Guardar conversación y lead en background (no bloquea la respuesta)
+    if (sessionId) {
+      const fullMessages = [...messages, { role: 'assistant', content: reply }]
+      const { nombre, telefono } = detectLead(messages)
+      const tiene_lead = !!(nombre && telefono)
+      const qualification = extractQualification(messages)
+
+      const saveConversation = supabase
+        .from('conversaciones')
+        .upsert(
+          {
+            inmobiliaria_id: inmobiliariaId,
+            session_id: sessionId,
+            messages: fullMessages,
+            tiene_lead,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'inmobiliaria_id,session_id' }
+        )
+
+      const saveLead = tiene_lead
+        ? (async () => {
+            const qualFields = Object.fromEntries(
+              Object.entries(qualification).filter(([, v]) => v !== null)
+            )
+            const consulta = messages
+              .filter((m: Msg) => m.role === 'user')
+              .slice(-4)
+              .map((m: Msg) => m.content)
+              .join(' | ')
+              .slice(0, 500)
+
+            // Verificar si ya existe un lead para esta sesión
+            const { data: existing } = await supabase
+              .from('leads')
+              .select('id')
+              .eq('inmobiliaria_id', inmobiliariaId)
+              .eq('session_id', sessionId)
+              .single()
+
+            if (existing) {
+              await supabase
+                .from('leads')
+                .update({ nombre, telefono, ...qualFields, consulta })
+                .eq('id', existing.id)
+            } else {
+              const { data: newLead } = await supabase
+                .from('leads')
+                .insert({
+                  inmobiliaria_id: inmobiliariaId,
+                  session_id: sessionId,
+                  nombre,
+                  telefono,
+                  canal: 'chatbot',
+                  consulta,
+                  ...qualFields,
+                })
+                .select('id')
+                .single()
+
+              // Vincular lead a la conversación
+              if (newLead) {
+                await supabase
+                  .from('conversaciones')
+                  .update({ lead_id: newLead.id })
+                  .eq('inmobiliaria_id', inmobiliariaId)
+                  .eq('session_id', sessionId)
+              }
+            }
+          })()
+        : Promise.resolve()
+
+      Promise.all([saveConversation, saveLead]).catch(console.error)
+    }
 
     return NextResponse.json({ reply })
   } catch (error) {
     console.error('Chat error:', error)
-    return NextResponse.json(
-      { error: 'Error al procesar la consulta' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Error al procesar la consulta' }, { status: 500 })
   }
 }

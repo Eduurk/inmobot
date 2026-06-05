@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
 import type { ChatMessage } from '@/lib/types'
 
 const QUICK_SUGGESTIONS = [
@@ -47,8 +46,16 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
-  const [leadSaved, setLeadSaved] = useState(false)
-  const [detectedLead, setDetectedLead] = useState<{ nombre?: string; telefono?: string }>({})
+
+  // Session ID persisted en sessionStorage (nueva sesión por pestaña/día)
+  const [sessionId] = useState<string>(() => {
+    if (typeof window === 'undefined') return `sess_${Math.random().toString(36).slice(2)}`
+    const stored = sessionStorage.getItem('inmobot_session')
+    if (stored) return stored
+    const newId = `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`
+    sessionStorage.setItem('inmobot_session', newId)
+    return newId
+  })
 
   const userMessageCount = messages.filter((m) => m.role === 'user').length
   const limitReached = userMessageCount >= MAX_USER_MESSAGES
@@ -65,39 +72,6 @@ export default function ChatWidget() {
     }
   }, [isOpen, messages])
 
-  const detectAndSaveLead = useCallback(
-    async (userMessage: string, allMessages: ChatMessage[]) => {
-      if (leadSaved) return
-
-      const phonePattern = /(?:\+?54\s?)?(?:11|(?:2|3)\d{2,3})[\s-]?\d{3,4}[\s-]?\d{4}/
-      const namePattern = /(?:me llamo|soy|mi nombre es|llamame)\s+([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,}(?:\s[A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,})?)/i
-      const genericNamePattern = /^([A-Z][a-záéíóúüñ]{2,}(?:\s[A-Z][a-záéíóúüñ]{2,})?)[\s,!.]*$/
-
-      const phoneMatch = userMessage.match(phonePattern)
-      const nameMatch = userMessage.match(namePattern) ?? userMessage.match(genericNamePattern)
-
-      const updated = { ...detectedLead }
-      if (phoneMatch) updated.telefono = phoneMatch[0].replace(/\s/g, '')
-      if (nameMatch) updated.nombre = nameMatch[1]?.trim()
-
-      setDetectedLead(updated)
-
-      if (updated.nombre && updated.telefono && inmobiliariaId) {
-        setLeadSaved(true)
-        const supabase = createClient()
-        const lastMessages = allMessages.slice(-4).map((m) => m.content).join(' | ')
-        await supabase.from('leads').insert({
-          inmobiliaria_id: inmobiliariaId,
-          nombre: updated.nombre,
-          telefono: updated.telefono,
-          consulta: lastMessages.slice(0, 500),
-          canal: 'chatbot',
-        })
-      }
-    },
-    [detectedLead, leadSaved, inmobiliariaId]
-  )
-
   const sendMessage = useCallback(
     async (content: string) => {
       const text = content.trim()
@@ -109,13 +83,11 @@ export default function ChatWidget() {
       setInput('')
       setIsTyping(true)
 
-      detectAndSaveLead(text, newMessages)
-
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: newMessages, inmobiliariaId }),
+          body: JSON.stringify({ messages: newMessages, inmobiliariaId, sessionId }),
         })
 
         const data = await res.json()
@@ -136,7 +108,7 @@ export default function ChatWidget() {
         setIsTyping(false)
       }
     },
-    [messages, isTyping, inmobiliariaId, detectAndSaveLead]
+    [messages, isTyping, inmobiliariaId, sessionId]
   )
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -242,10 +214,7 @@ export default function ChatWidget() {
               <p className="text-xs text-amber-800 font-medium text-center">
                 Límite de consultas alcanzado.{' '}
                 {inmobiliariaId && (
-                  <a
-                    href={`https://wa.me/`}
-                    className="underline text-amber-900"
-                  >
+                  <a href={`https://wa.me/`} className="underline text-amber-900">
                     Contactanos por WhatsApp
                   </a>
                 )}
