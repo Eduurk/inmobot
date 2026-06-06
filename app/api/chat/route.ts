@@ -7,14 +7,18 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 type Msg = { role: string; content: string }
 
 function detectLead(messages: Msg[]) {
-  const phonePattern = /(?:\+?54\s?)?(?:11|(?:2|3)\d{2,3})[\s-]?\d{3,4}[\s-]?\d{4}/
-  // Frase explícita: "me llamo X", "soy X", etc.
-  const namePattern = /(?:me llamo|soy|mi nombre es|llamame)\s+([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,}(?:\s[A-Za-záéíóúüÜñÑ]{2,})?)/i
-  // Dos palabras que parecen nombre completo (cualquier capitalización)
-  const fullNamePattern = /^([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,}(?:\s[A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,})+)[\s,!.]*$/
-  // Nombre simple (solo cuando el bot lo pidió)
-  const singleNamePattern = /^([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,})[\s,!.]*$/
+  // Teléfono: formato argentino estricto (10 dígitos) o inline ("mi numero es XXXXXXXX")
+  const phonePattern = /(?:\+?54\s?)?(?:11|(?:2|3)\d{1,3})[\s-]?\d{3,4}[\s-]?\d{3,4}/
+  const inlinePhonePattern = /(?:numero|n[uú]mero|tel[eé]fono|tel|celular)[^\d]*(\d{7,11})/i
+
+  // Nombre: frase explícita / nombre+apellido antes de "y mi numero" / nombre completo solo / contexto
+  const nameExplicit = /(?:me llamo|soy|mi nombre es|llamame)\s+([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,}(?:\s[A-Za-záéíóúüÜñÑ]{2,})?)/i
+  const nameBeforePhone = /^([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,}(?:\s[A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,})+)\s+y\s+/i
+  const fullName = /^([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,}(?:\s[A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,})+)[\s,!.]*$/
+  const singleName = /^([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,})[\s,!.]*$/
+
   const botAskedName = /tu nombre|cómo te llamás|cuál es tu nombre|nombre para|podés dar.*nombre/i
+  const botAskedContact = /nombre.*tel[eé]fono|tel[eé]fono.*nombre|nombre y.*n[uú]mero|contactarte|contactar/i
 
   let nombre: string | undefined
   let telefono: string | undefined
@@ -23,18 +27,28 @@ function detectLead(messages: Msg[]) {
     const msg = messages[i]
     if (msg.role !== 'user') continue
 
-    const phoneMatch = msg.content.match(phonePattern)
-    const nameMatch = msg.content.match(namePattern) ?? msg.content.match(fullNamePattern)
+    // Teléfono
+    const phoneMatch = msg.content.match(phonePattern) ?? msg.content.match(inlinePhonePattern)
+    if (phoneMatch) telefono = (phoneMatch[1] ?? phoneMatch[0]).replace(/[\s-]/g, '')
 
-    if (phoneMatch) telefono = phoneMatch[0].replace(/\s/g, '')
+    // Nombre
+    const nameMatch = msg.content.match(nameExplicit)
+      ?? msg.content.match(nameBeforePhone)
+      ?? msg.content.match(fullName)
     if (nameMatch) nombre = (nameMatch[1] ?? nameMatch[0])?.trim()
 
-    // Contexto: si el bot preguntó el nombre, la respuesta del usuario es el nombre
-    if (!nameMatch && i > 0) {
-      const prevBot = messages[i - 1]
-      if (prevBot?.role === 'assistant' && botAskedName.test(prevBot.content)) {
-        const single = msg.content.trim().match(singleNamePattern)
-        if (single) nombre = single[1].trim()
+    // Contexto: bot preguntó nombre o contacto en el turno anterior
+    if (i > 0) {
+      const prev = messages[i - 1]
+      if (prev?.role === 'assistant') {
+        if (!nombre && botAskedName.test(prev.content)) {
+          const m = msg.content.trim().match(singleName)
+          if (m) nombre = m[1].trim()
+        }
+        if (!telefono && botAskedContact.test(prev.content)) {
+          const m = msg.content.match(/\d{7,11}/)
+          if (m) telefono = m[0]
+        }
       }
     }
   }
