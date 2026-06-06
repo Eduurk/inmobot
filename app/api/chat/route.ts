@@ -8,17 +8,35 @@ type Msg = { role: string; content: string }
 
 function detectLead(messages: Msg[]) {
   const phonePattern = /(?:\+?54\s?)?(?:11|(?:2|3)\d{2,3})[\s-]?\d{3,4}[\s-]?\d{4}/
+  // Frase explícita: "me llamo X", "soy X", etc.
   const namePattern = /(?:me llamo|soy|mi nombre es|llamame)\s+([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,}(?:\s[A-Za-záéíóúüÜñÑ]{2,})?)/i
-  const genericNamePattern = /^([A-Z][a-záéíóúüñ]{2,}(?:\s[A-Z][a-záéíóúüñ]{2,})?)[\s,!.]*$/
+  // Dos palabras que parecen nombre completo (cualquier capitalización)
+  const fullNamePattern = /^([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,}(?:\s[A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,})+)[\s,!.]*$/
+  // Nombre simple (solo cuando el bot lo pidió)
+  const singleNamePattern = /^([A-Za-záéíóúÁÉÍÓÚüÜñÑ]{2,})[\s,!.]*$/
+  const botAskedName = /tu nombre|cómo te llamás|cuál es tu nombre|nombre para|podés dar.*nombre/i
 
   let nombre: string | undefined
   let telefono: string | undefined
 
-  for (const msg of messages.filter((m) => m.role === 'user')) {
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    if (msg.role !== 'user') continue
+
     const phoneMatch = msg.content.match(phonePattern)
-    const nameMatch = msg.content.match(namePattern) ?? msg.content.match(genericNamePattern)
+    const nameMatch = msg.content.match(namePattern) ?? msg.content.match(fullNamePattern)
+
     if (phoneMatch) telefono = phoneMatch[0].replace(/\s/g, '')
     if (nameMatch) nombre = (nameMatch[1] ?? nameMatch[0])?.trim()
+
+    // Contexto: si el bot preguntó el nombre, la respuesta del usuario es el nombre
+    if (!nameMatch && i > 0) {
+      const prevBot = messages[i - 1]
+      if (prevBot?.role === 'assistant' && botAskedName.test(prevBot.content)) {
+        const single = msg.content.trim().match(singleNamePattern)
+        if (single) nombre = single[1].trim()
+      }
+    }
   }
 
   return { nombre, telefono }
