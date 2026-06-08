@@ -16,7 +16,7 @@ async function getData() {
     supabase.from('inmobiliaria').select('*').eq('id', inmobiliariaId).single(),
     supabase
       .from('propiedades')
-      .select('*, fotos_propiedad(url, es_principal, orden)')
+      .select('id, inmobiliaria_id, titulo, tipo, operacion, precio, moneda, precio_periodo, direccion, zona, metros_cuadrados, ambientes, dormitorios, banos, cochera, apto_credito, descripcion, caracteristicas, estado, destacada, audio_tour_url, audio_tour_estado, created_at, fotos_propiedad(url, es_principal, orden)')
       .eq('inmobiliaria_id', inmobiliariaId)
       .eq('estado', 'disponible')
       .order('destacada', { ascending: false })
