@@ -16,7 +16,7 @@ async function getData() {
     supabase.from('inmobiliaria').select('*').eq('id', inmobiliariaId).single(),
     supabase
       .from('propiedades')
-      .select('id, inmobiliaria_id, titulo, tipo, operacion, precio, moneda, precio_periodo, direccion, zona, metros_cuadrados, ambientes, dormitorios, banos, cochera, apto_credito, descripcion, caracteristicas, estado, destacada, audio_tour_url, audio_tour_estado, created_at, fotos_propiedad(url, es_principal, orden)')
+      .select('id, inmobiliaria_id, titulo, tipo, operacion, precio, moneda, precio_periodo, direccion, zona, metros_cuadrados, ambientes, dormitorios, banos, cochera, apto_credito, descripcion, caracteristicas, estado, destacada, audio_tour_url, audio_tour_script, audio_tour_estado, created_at, fotos_propiedad(url, es_principal, orden)')
       .eq('inmobiliaria_id', inmobiliariaId)
       .eq('estado', 'disponible')
       .order('destacada', { ascending: false })
@@ -24,9 +24,10 @@ async function getData() {
       .limit(9),
   ])
 
-  const destacadas = (propiedades ?? []).filter((p: Propiedad) => p.destacada).slice(0, 3)
-  const recientes = (propiedades ?? []).filter((p: Propiedad) => !p.destacada).slice(0, 6)
-  const todas = destacadas.length > 0 ? [...destacadas, ...recientes] : (propiedades ?? []).slice(0, 6)
+  const allProps = (propiedades ?? []) as unknown as Propiedad[]
+  const destacadas = allProps.filter((p) => p.destacada).slice(0, 3)
+  const recientes = allProps.filter((p) => !p.destacada).slice(0, 6)
+  const todas = destacadas.length > 0 ? [...destacadas, ...recientes] : allProps.slice(0, 6)
 
   return { inmo: inmo as Inmobiliaria | null, destacadas: todas, total: propiedades?.length ?? 0 }
 }
