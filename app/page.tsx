@@ -81,22 +81,28 @@ export default async function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="relative bg-oscuro text-crema overflow-hidden">
-        {/* Video de fondo */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-70"
-          src="https://pikjjmsaqfckdxpnenja.supabase.co/storage/v1/object/public/fotos-propiedades/Hands_handing_over_house_keys_202606030827.mp4"
-        />
-        {/* Overlay más liviano para que el video se vea */}
-        <div className="absolute inset-0 bg-gradient-to-r from-oscuro/80 via-oscuro/40 to-oscuro/10" />
-        <div className="absolute inset-0 bg-gradient-to-t from-oscuro/40 via-transparent to-transparent" />
+      <section className="relative bg-oscuro text-crema overflow-hidden min-h-[92vh] flex flex-col justify-between">
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-32">
-          <div className="max-w-3xl">
+        {/* Spline 3D — ocupa toda la derecha en desktop */}
+        <div className="hidden lg:block absolute right-0 top-0 w-[58%] h-full">
+          <iframe
+            src="https://my.spline.design/architecturalstudiowebdesignherosection-dEE4pU4HFYhD4OdbVcauRYNi/"
+            className="w-full h-full border-0"
+            loading="lazy"
+            title="3D Architectural Scene"
+          />
+        </div>
+
+        {/* Gradiente que funde Spline con el lado oscuro */}
+        <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-oscuro via-oscuro/95 via-[45%] to-transparent pointer-events-none z-[1]" />
+        {/* Gradiente inferior */}
+        <div className="absolute inset-0 bg-gradient-to-t from-oscuro/60 via-transparent to-transparent pointer-events-none z-[1]" />
+
+        {/* Fondo oscuro para mobile (sin Spline) */}
+        <div className="lg:hidden absolute inset-0 bg-gradient-to-br from-oscuro via-oscuro to-oscuro/80" />
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-36 w-full">
+          <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 bg-dorado/20 border border-dorado/30 px-3 py-1.5 rounded-full text-dorado text-sm mb-6">
               <span className="w-2 h-2 bg-dorado rounded-full animate-pulse" />
               Asistente IA disponible 24/7
@@ -105,7 +111,7 @@ export default async function LandingPage() {
               Encontrá tu próximo<br />
               <span className="text-dorado">hogar en {ciudad}</span>
             </h1>
-            <p className="text-crema/70 text-lg md:text-xl max-w-xl mb-8 leading-relaxed">
+            <p className="text-crema/70 text-lg md:text-xl max-w-lg mb-8 leading-relaxed">
               {descripcion}
             </p>
             <div className="flex flex-wrap gap-3">
