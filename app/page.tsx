@@ -1,7 +1,6 @@
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import PropCard from '@/components/PropCard'
 import ChatWidget from '@/components/ChatWidget'
-import VantaHero from '@/components/VantaHero'
 import type { Inmobiliaria, Propiedad } from '@/lib/types'
 
 // Siempre renderizar en el servidor para mostrar propiedades en tiempo real
@@ -85,8 +84,8 @@ export default async function LandingPage() {
       {/* Hero */}
       <section className="relative bg-oscuro text-crema overflow-hidden min-h-[92vh] flex flex-col justify-between">
 
-        {/* Spline 3D — ocupa toda la derecha en desktop */}
-        <div className="hidden lg:block absolute right-0 top-0 w-[58%] h-full">
+        {/* Spline 3D — desktop: mitad derecha | mobile: fondo completo */}
+        <div className="absolute inset-0 lg:inset-auto lg:right-0 lg:top-0 lg:w-[58%] lg:h-full">
           <iframe
             src="https://my.spline.design/architecturalstudiowebdesignherosection-dEE4pU4HFYhD4OdbVcauRYNi/"
             className="w-full h-full border-0"
@@ -95,17 +94,12 @@ export default async function LandingPage() {
           />
         </div>
 
-        {/* Gradiente que funde Spline con el lado oscuro */}
+        {/* Desktop: gradiente izquierda para fundir Spline con oscuro */}
         <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-oscuro via-oscuro/95 via-[45%] to-transparent pointer-events-none z-[1]" />
-        {/* Gradiente inferior */}
-        <div className="absolute inset-0 bg-gradient-to-t from-oscuro/60 via-transparent to-transparent pointer-events-none z-[1]" />
-
-        {/* Vanta.js waves — solo mobile (desktop usa Spline) */}
-        <div className="lg:hidden absolute inset-0">
-          <VantaHero />
-        </div>
-        {/* Overlay oscuro sobre Vanta para que el texto sea legible */}
-        <div className="lg:hidden absolute inset-0 bg-oscuro/60 pointer-events-none" />
+        {/* Mobile: overlay oscuro sobre Spline para que el texto sea legible */}
+        <div className="lg:hidden absolute inset-0 bg-oscuro/55 pointer-events-none z-[1]" />
+        {/* Gradiente inferior siempre */}
+        <div className="absolute inset-0 bg-gradient-to-t from-oscuro/70 via-transparent to-transparent pointer-events-none z-[1]" />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-36 w-full">
           <div className="max-w-xl">
