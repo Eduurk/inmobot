@@ -104,6 +104,21 @@ export default function PropCard({ propiedad }: PropCardProps) {
             </span>
           </div>
         )}
+
+        {/* Tour Virtual badge */}
+        {propiedad.audio_tour_estado === 'done' && (
+          <a
+            href={`/tour/${propiedad.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white text-xs font-semibold px-2.5 py-1.5 rounded-full hover:bg-dorado hover:text-oscuro transition-colors"
+          >
+            <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            Tour Virtual
+          </a>
+        )}
       </div>
 
       {/* Contenido */}
