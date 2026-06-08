@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import PropForm from '@/components/PropForm'
+import TourSection from '@/components/TourSection'
 import { notFound } from 'next/navigation'
 import type { Propiedad } from '@/lib/types'
 
@@ -15,6 +16,7 @@ export default async function EditarPropiedadPage({ params }: PageProps) {
     .select('*, fotos_propiedad(id, url, es_principal, orden)')
     .eq('id', params.id)
     .single()
+
 
   if (error || !data) notFound()
 
@@ -39,6 +41,9 @@ export default async function EditarPropiedadPage({ params }: PageProps) {
         existingPhotos={existingPhotos}
         propiedadId={propiedad.id}
       />
+      <div className="mt-6 pb-8">
+        <TourSection propiedad={propiedad} />
+      </div>
     </div>
   )
 }

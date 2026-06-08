@@ -39,8 +39,25 @@ export interface Propiedad {
   caracteristicas: string[] | null
   estado: EstadoPropiedad
   destacada: boolean
+  audio_tour_url: string | null
+  audio_tour_script: AudioTourScript | null
+  audio_tour_estado: AudioTourEstado
   created_at: string
   fotos_propiedad?: FotoPropiedad[]
+}
+
+export type AudioTourEstado = 'none' | 'generating' | 'done' | 'error'
+
+export interface AudioTourSlide {
+  indice: number
+  inicio: number
+  duracion: number
+}
+
+export interface AudioTourScript {
+  narracion: string
+  slides: AudioTourSlide[]
+  total_segundos: number
 }
 
 export interface FotoPropiedad {
