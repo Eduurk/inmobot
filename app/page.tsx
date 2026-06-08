@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import PropCard from '@/components/PropCard'
 import ChatWidget from '@/components/ChatWidget'
+import VantaHero from '@/components/VantaHero'
 import type { Inmobiliaria, Propiedad } from '@/lib/types'
 
 // Siempre renderizar en el servidor para mostrar propiedades en tiempo real
@@ -99,8 +100,12 @@ export default async function LandingPage() {
         {/* Gradiente inferior */}
         <div className="absolute inset-0 bg-gradient-to-t from-oscuro/60 via-transparent to-transparent pointer-events-none z-[1]" />
 
-        {/* Fondo oscuro para mobile (sin Spline) */}
-        <div className="lg:hidden absolute inset-0 bg-gradient-to-br from-oscuro via-oscuro to-oscuro/80" />
+        {/* Vanta.js waves — solo mobile (desktop usa Spline) */}
+        <div className="lg:hidden absolute inset-0">
+          <VantaHero />
+        </div>
+        {/* Overlay oscuro sobre Vanta para que el texto sea legible */}
+        <div className="lg:hidden absolute inset-0 bg-oscuro/60 pointer-events-none" />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-36 w-full">
           <div className="max-w-xl">
