@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import PropCard from '@/components/PropCard'
 import ChatWidget from '@/components/ChatWidget'
+import MagneticVideo from '@/components/MagneticVideo'
 import type { Inmobiliaria, Propiedad } from '@/lib/types'
 
 // Siempre renderizar en el servidor para mostrar propiedades en tiempo real
@@ -84,22 +85,17 @@ export default async function LandingPage() {
       {/* Hero */}
       <section className="relative bg-oscuro text-crema overflow-hidden min-h-[92vh] flex flex-col justify-between">
 
-        {/* Spline 3D — desktop: mitad derecha | mobile: fondo completo */}
-        <div className="absolute inset-0 lg:inset-auto lg:right-0 lg:top-0 lg:w-[58%] lg:h-full">
-          <iframe
-            src="https://my.spline.design/architecturalstudiowebdesignherosection-dEE4pU4HFYhD4OdbVcauRYNi/"
-            className="w-full h-full border-0"
-            loading="lazy"
-            title="3D Architectural Scene"
-          />
+        {/* Video 3D magnético — desktop derecha, mobile oculto */}
+        <div className="hidden lg:flex absolute right-0 top-0 w-[52%] h-full items-center justify-center pr-8 z-[2]">
+          <MagneticVideo src="/edificio-hero.mp4" width={460} height={460} strength={0.3} />
         </div>
 
-        {/* Desktop: gradiente izquierda para fundir Spline con oscuro */}
-        <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-oscuro via-oscuro/95 via-[45%] to-transparent pointer-events-none z-[1]" />
-        {/* Mobile: overlay oscuro sobre Spline para que el texto sea legible */}
-        <div className="lg:hidden absolute inset-0 bg-oscuro/55 pointer-events-none z-[1]" />
-        {/* Gradiente inferior siempre */}
-        <div className="absolute inset-0 bg-gradient-to-t from-oscuro/70 via-transparent to-transparent pointer-events-none z-[1]" />
+        {/* Gradiente que funde el video con el fondo oscuro */}
+        <div className="hidden lg:block absolute inset-0 bg-gradient-to-r from-oscuro via-oscuro/90 via-[42%] to-transparent pointer-events-none z-[1]" />
+        {/* Mobile: fondo oscuro sólido */}
+        <div className="lg:hidden absolute inset-0 bg-gradient-to-br from-oscuro via-oscuro to-oscuro/90" />
+        {/* Gradiente inferior */}
+        <div className="absolute inset-0 bg-gradient-to-t from-oscuro/60 via-transparent to-transparent pointer-events-none z-[1]" />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-36 w-full">
           <div className="max-w-xl">
