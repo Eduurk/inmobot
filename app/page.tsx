@@ -85,9 +85,25 @@ export default async function LandingPage() {
       {/* Hero */}
       <section className="relative bg-oscuro text-crema overflow-hidden min-h-[92vh] flex flex-col justify-between">
 
+        {/* Dots grid background */}
+        <div className="absolute inset-0 opacity-[0.04]" style={{backgroundImage:'radial-gradient(circle, #d4af37 1px, transparent 1px)', backgroundSize:'40px 40px'}} />
+
         {/* Video 3D magnético — desktop derecha, mobile oculto */}
         <div className="hidden lg:flex absolute right-0 top-0 w-[52%] h-full items-center justify-center pr-8 z-[2]">
-          <MagneticVideo src="/edificio-hero.mp4" width={460} height={460} strength={0.3} />
+          <MagneticVideo src="/edificio-hero.mp4" width={500} height={500} strength={0.3} />
+          {/* Floating badges alrededor del edificio */}
+          <div className="absolute top-[22%] right-[18%] bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl px-4 py-2.5 text-right">
+            <p className="text-dorado font-bold text-lg leading-none">100%</p>
+            <p className="text-crema/60 text-xs mt-0.5">Consultas respondidas</p>
+          </div>
+          <div className="absolute bottom-[28%] right-[12%] bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl px-4 py-2.5">
+            <p className="text-dorado font-bold text-lg leading-none">24/7</p>
+            <p className="text-crema/60 text-xs mt-0.5">Asistente IA activo</p>
+          </div>
+          <div className="absolute bottom-[38%] left-[8%] bg-dorado/20 backdrop-blur-md border border-dorado/30 rounded-2xl px-3 py-2 flex items-center gap-2">
+            <span className="w-2 h-2 bg-dorado rounded-full animate-pulse" />
+            <p className="text-dorado text-xs font-semibold">Necochea · Costa Atlántica</p>
+          </div>
         </div>
 
         {/* Gradiente que funde el video con el fondo oscuro */}
@@ -110,7 +126,7 @@ export default async function LandingPage() {
             <p className="text-crema/70 text-lg md:text-xl max-w-lg mb-8 leading-relaxed">
               {descripcion}
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 mb-10">
               <a
                 href="#propiedades"
                 className="bg-dorado text-oscuro px-6 py-3 rounded-full font-semibold text-sm hover:bg-dorado-light transition-colors"
@@ -123,6 +139,28 @@ export default async function LandingPage() {
               >
                 Hablar con un asesor
               </a>
+            </div>
+            {/* Mini stats bajo los botones */}
+            <div className="flex gap-6">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-dorado/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-dorado" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+                </div>
+                <div>
+                  <p className="text-crema font-semibold text-sm">{total}+ propiedades</p>
+                  <p className="text-crema/40 text-xs">disponibles hoy</p>
+                </div>
+              </div>
+              <div className="w-px bg-crema/10" />
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-dorado/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-dorado" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/></svg>
+                </div>
+                <div>
+                  <p className="text-crema font-semibold text-sm">IA responde al instante</p>
+                  <p className="text-crema/40 text-xs">consultas 24 horas</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

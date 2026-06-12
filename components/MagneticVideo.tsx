@@ -35,6 +35,15 @@ export default function MagneticVideo({ src, width = 420, height = 420, strength
       className="relative cursor-none select-none"
       style={{ width, height }}
     >
+      {/* Glow dorado detrás del edificio */}
+      <div
+        className="absolute inset-0 rounded-full pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse 60% 60% at 50% 55%, rgba(184,134,11,0.18) 0%, transparent 70%)',
+          transform: `translate(${pos.x * 0.5}px, ${pos.y * 0.5}px)`,
+          transition: pos.x === 0 ? 'transform 0.8s ease-out' : 'transform 0.15s ease-out',
+        }}
+      />
       <div
         style={{
           transform: `translate(${pos.x}px, ${pos.y}px)`,
@@ -49,8 +58,8 @@ export default function MagneticVideo({ src, width = 420, height = 420, strength
           loop
           muted
           playsInline
-          className="w-full h-full object-contain drop-shadow-2xl"
-          style={{ filter: 'drop-shadow(0 30px 60px rgba(184,134,11,0.25))' }}
+          className="w-full h-full object-contain"
+          style={{ mixBlendMode: 'screen' }}
         />
       </div>
     </div>
