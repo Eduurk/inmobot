@@ -2,6 +2,11 @@ import { createServiceRoleClient } from '@/lib/supabase-server'
 import PropCard from '@/components/PropCard'
 import ChatWidget from '@/components/ChatWidget'
 import MagneticVideo from '@/components/MagneticVideo'
+import StatsSection from '@/components/sections/StatsSection'
+import ProcesoSection from '@/components/sections/ProcesoSection'
+import ZonasSection from '@/components/sections/ZonasSection'
+import FeaturesSection from '@/components/sections/FeaturesSection'
+import CTAFinalSection from '@/components/sections/CTAFinalSection'
 import type { Inmobiliaria, Propiedad } from '@/lib/types'
 
 // Siempre renderizar en el servidor para mostrar propiedades en tiempo real
@@ -239,6 +244,18 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* Stats animados */}
+      <StatsSection />
+
+      {/* Proceso */}
+      <ProcesoSection />
+
+      {/* Zonas */}
+      <ZonasSection />
+
+      {/* Features / Por qué elegirnos */}
+      <FeaturesSection />
+
       {/* Nosotros */}
       <section id="nosotros" className="bg-oscuro text-crema">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 md:py-20">
@@ -346,6 +363,9 @@ export default async function LandingPage() {
           )}
         </div>
       </section>
+
+      {/* CTA Final */}
+      <CTAFinalSection whatsapp={whatsapp} ciudad={ciudad} />
 
       {/* Footer */}
       <footer className="bg-oscuro border-t border-crema/10">
