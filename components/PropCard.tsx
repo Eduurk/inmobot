@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import type { Propiedad } from '@/lib/types'
 
 interface PropCardProps {
@@ -51,7 +52,9 @@ export default function PropCard({ propiedad }: PropCardProps) {
   ].filter(Boolean) as string[]
 
   return (
-    <div className="group bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 border border-crema-dark hover:border-dorado/30 flex flex-col">
+    <div className="relative group bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 border border-crema-dark hover:border-dorado/30 flex flex-col">
+      {/* Overlay link para toda la card */}
+      <Link href={`/propiedades/${propiedad.id}`} className="absolute inset-0 z-[1]" aria-label={propiedad.titulo} />
 
       {/* Imagen */}
       <div className="relative h-56 bg-oscuro/5 overflow-hidden shrink-0">
@@ -111,7 +114,7 @@ export default function PropCard({ propiedad }: PropCardProps) {
             href={`/tour/${propiedad.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white text-xs font-semibold px-2.5 py-1.5 rounded-full hover:bg-dorado hover:text-oscuro transition-colors"
+            className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white text-xs font-semibold px-2.5 py-1.5 rounded-full hover:bg-dorado hover:text-oscuro transition-colors"
           >
             <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
