@@ -1,7 +1,13 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import type { ChatMessage } from '@/lib/types'
+import type { PropPreview } from '@/app/api/chat/route'
+
+type ExtendedMessage = {
+  role: 'user' | 'assistant'
+  content: string
+  propiedades?: PropPreview[]
+}
 
 const QUICK_SUGGESTIONS = [
   '¿Qué propiedades tienen disponibles?',
@@ -10,9 +16,51 @@ const QUICK_SUGGESTIONS = [
   '¿Aceptan crédito hipotecario?',
 ]
 
-const GREETING: ChatMessage = {
+const GREETING: ExtendedMessage = {
   role: 'assistant',
-  content: '¡Hola! Soy el asistente virtual. Podés consultarme sobre nuestras propiedades disponibles, precios y visitas. ¿En qué te puedo ayudar?',
+  content: '¡Hola! Soy el asistente virtual de ventas. Podés preguntarme por propiedades, precios y visitas. ¿Qué estás buscando?',
+}
+
+const operacionLabel: Record<string, string> = { venta: 'Venta', alquiler: 'Alquiler', temporada: 'Temporada' }
+
+function PropCard({ prop }: { prop: PropPreview }) {
+  return (
+    <a
+      href={`/propiedades/${prop.id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2.5 bg-white border border-crema-dark rounded-xl p-2 hover:border-dorado/50 hover:shadow-md transition-all group"
+    >
+      {/* Foto */}
+      <div className="shrink-0 w-16 h-14 rounded-lg overflow-hidden bg-crema">
+        {prop.foto_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={prop.foto_url} alt={prop.titulo} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <svg className="w-6 h-6 text-dorado/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-dorado font-semibold uppercase tracking-wide mb-0.5">
+          {operacionLabel[prop.operacion] ?? prop.operacion}
+        </p>
+        <p className="text-oscuro font-semibold text-xs leading-tight line-clamp-2 mb-1">{prop.titulo}</p>
+        {prop.zona && <p className="text-oscuro/50 text-xs truncate">{prop.zona}</p>}
+      </div>
+
+      {/* Precio */}
+      <div className="shrink-0 text-right">
+        <p className="text-dorado font-bold text-xs leading-tight whitespace-nowrap">{prop.precio}</p>
+        <p className="text-oscuro/40 text-xs mt-1 group-hover:text-dorado transition-colors">Ver →</p>
+      </div>
+    </a>
+  )
 }
 
 function SendIcon() {
@@ -41,13 +89,11 @@ function ChatIcon() {
 
 export default function ChatWidget() {
   const MAX_USER_MESSAGES = 20
-
   const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>([GREETING])
+  const [messages, setMessages] = useState<ExtendedMessage[]>([GREETING])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
 
-  // Session ID persisted en sessionStorage (nueva sesión por pestaña/día)
   const [sessionId] = useState<string>(() => {
     if (typeof window === 'undefined') return `sess_${Math.random().toString(36).slice(2)}`
     const stored = sessionStorage.getItem('inmobot_session')
@@ -59,10 +105,8 @@ export default function ChatWidget() {
 
   const userMessageCount = messages.filter((m) => m.role === 'user').length
   const limitReached = userMessageCount >= MAX_USER_MESSAGES
-
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-
   const inmobiliariaId = process.env.NEXT_PUBLIC_INMOBILIARIA_ID
 
   useEffect(() => {
@@ -77,8 +121,10 @@ export default function ChatWidget() {
       const text = content.trim()
       if (!text || isTyping) return
 
-      const userMsg: ChatMessage = { role: 'user', content: text }
-      const newMessages: ChatMessage[] = [...messages, userMsg]
+      const userMsg: ExtendedMessage = { role: 'user', content: text }
+      // Solo enviamos texto plano al API (sin propiedades)
+      const historyForApi = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }))
+      const newMessages: ExtendedMessage[] = [...messages, userMsg]
       setMessages(newMessages)
       setInput('')
       setIsTyping(true)
@@ -87,23 +133,18 @@ export default function ChatWidget() {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: newMessages, inmobiliariaId, sessionId }),
+          body: JSON.stringify({ messages: historyForApi, inmobiliariaId, sessionId }),
         })
 
         const data = await res.json()
-        const reply: ChatMessage = {
+        const reply: ExtendedMessage = {
           role: 'assistant',
           content: data.reply ?? 'Hubo un problema, intentá de nuevo.',
+          propiedades: data.propiedades?.length > 0 ? data.propiedades : undefined,
         }
         setMessages([...newMessages, reply])
       } catch {
-        setMessages([
-          ...newMessages,
-          {
-            role: 'assistant',
-            content: 'No pude procesar tu consulta. Por favor, intentá de nuevo o contactanos por WhatsApp.',
-          },
-        ])
+        setMessages([...newMessages, { role: 'assistant', content: 'No pude procesar tu consulta. Intentá de nuevo o contactanos por WhatsApp.' }])
       } finally {
         setIsTyping(false)
       }
@@ -134,7 +175,7 @@ export default function ChatWidget() {
 
       {/* Chat window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[380px] max-w-[calc(100vw-2rem)] h-[580px] max-h-[calc(100dvh-4rem)] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+        <div className="fixed bottom-6 right-6 z-50 w-[390px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100dvh-4rem)] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
 
           {/* Header */}
           <div className="bg-oscuro px-4 py-3 flex items-center gap-3 shrink-0">
@@ -147,14 +188,10 @@ export default function ChatWidget() {
               <p className="text-crema font-semibold text-sm truncate">Asistente Virtual</p>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse shrink-0" />
-                <span className="text-crema/60 text-xs">En línea</span>
+                <span className="text-crema/60 text-xs">En línea · Responde al instante</span>
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="text-crema/50 hover:text-crema transition-colors shrink-0"
-              aria-label="Cerrar chat"
-            >
+            <button onClick={() => setIsOpen(false)} className="text-crema/50 hover:text-crema transition-colors shrink-0" aria-label="Cerrar chat">
               <CloseIcon />
             </button>
           </div>
@@ -162,19 +199,28 @@ export default function ChatWidget() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-crema/30">
             {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
-              >
-                <div
-                  className={`max-w-[82%] px-4 py-2.5 text-sm leading-relaxed ${
-                    msg.role === 'user'
-                      ? 'bg-dorado text-oscuro font-medium rounded-2xl rounded-br-sm'
-                      : 'bg-white text-oscuro rounded-2xl rounded-bl-sm shadow-sm border border-crema-dark'
-                  }`}
-                >
-                  {msg.content}
-                </div>
+              <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fade-in gap-2`}>
+                {/* Burbuja de texto */}
+                {msg.content && (
+                  <div
+                    className={`max-w-[82%] px-4 py-2.5 text-sm leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'bg-dorado text-oscuro font-medium rounded-2xl rounded-br-sm'
+                        : 'bg-white text-oscuro rounded-2xl rounded-bl-sm shadow-sm border border-crema-dark'
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                )}
+
+                {/* Mini-cards de propiedades */}
+                {msg.propiedades && msg.propiedades.length > 0 && (
+                  <div className="w-full max-w-[90%] flex flex-col gap-2">
+                    {msg.propiedades.map((prop) => (
+                      <PropCard key={prop.id} prop={prop} />
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
 
@@ -213,21 +259,14 @@ export default function ChatWidget() {
             <div className="px-4 py-3 bg-amber-50 border-t border-amber-200 shrink-0">
               <p className="text-xs text-amber-800 font-medium text-center">
                 Límite de consultas alcanzado.{' '}
-                {inmobiliariaId && (
-                  <a href={`https://wa.me/`} className="underline text-amber-900">
-                    Contactanos por WhatsApp
-                  </a>
-                )}
+                <a href={`https://wa.me/`} className="underline text-amber-900">Contactanos por WhatsApp</a>
               </p>
             </div>
           )}
 
           {/* Input */}
           {!limitReached && (
-            <form
-              onSubmit={handleSubmit}
-              className="p-3 border-t border-crema-dark bg-white flex gap-2 shrink-0"
-            >
+            <form onSubmit={handleSubmit} className="p-3 border-t border-crema-dark bg-white flex gap-2 shrink-0">
               <input
                 ref={inputRef}
                 type="text"
@@ -248,7 +287,6 @@ export default function ChatWidget() {
             </form>
           )}
 
-          {/* Contador discreto */}
           {!limitReached && userMessageCount >= 15 && (
             <p className="text-center text-oscuro/30 text-xs pb-1 shrink-0">
               {MAX_USER_MESSAGES - userMessageCount} consulta{MAX_USER_MESSAGES - userMessageCount !== 1 ? 's' : ''} restante{MAX_USER_MESSAGES - userMessageCount !== 1 ? 's' : ''}
