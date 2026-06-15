@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import type { PropPreview } from '@/lib/types'
+import { notifyNewLead } from '@/lib/notifications'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -210,7 +211,17 @@ TONO Y VENTAS:
               await supabase.from('leads').update({ nombre, telefono, ...qualFields, consulta }).eq('id', existing.id)
             } else {
               const { data: newLead } = await supabase.from('leads').insert({ inmobiliaria_id: inmobiliariaId, session_id: sessionId, nombre, telefono, canal: 'chatbot', consulta, ...qualFields }).select('id').single()
-              if (newLead) await supabase.from('conversaciones').update({ lead_id: newLead.id }).eq('inmobiliaria_id', inmobiliariaId).eq('session_id', sessionId)
+              if (newLead) {
+                await supabase.from('conversaciones').update({ lead_id: newLead.id }).eq('inmobiliaria_id', inmobiliariaId).eq('session_id', sessionId)
+                notifyNewLead({
+                  inmoNombre: inmo.nombre,
+                  ownerEmail: inmo.email,
+                  ownerWhatsapp: inmo.whatsapp ?? inmo.telefono,
+                  leadNombre: nombre!,
+                  leadTelefono: telefono!,
+                  consulta,
+                }).catch(console.error)
+              }
             }
           })()
         : Promise.resolve()
