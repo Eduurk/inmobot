@@ -1,20 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
+import type { PropPreview } from '@/lib/types'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 type Msg = { role: string; content: string }
-
-export type PropPreview = {
-  id: string
-  titulo: string
-  precio: string
-  zona: string | null
-  foto_url: string | null
-  operacion: string
-  tipo: string
-}
 
 function detectLead(messages: Msg[]) {
   const phonePattern = /(?:\+?54\s?)?(?:11|(?:2|3)\d{1,3})[\s-]?\d{3,4}[\s-]?\d{3,4}/
@@ -178,23 +169,22 @@ TONO Y VENTAS:
     let propsPreviews: PropPreview[] = []
     if (propsTagMatch && propiedades) {
       const ids = propsTagMatch[1].split(',').map((id) => id.trim()).filter(Boolean).slice(0, 3)
-      propsPreviews = ids
-        .map((id) => {
-          const p = propiedades.find((pr) => pr.id === id)
-          if (!p) return null
-          const fotos = (p.fotos_propiedad ?? []) as { url: string; es_principal: boolean; orden: number }[]
-          const fotoUrl = fotos.find((f) => f.es_principal)?.url ?? fotos.sort((a, b) => a.orden - b.orden)[0]?.url ?? null
-          return {
-            id: p.id,
-            titulo: p.titulo,
-            precio: formatPrecio(p),
-            zona: p.zona ?? p.direccion ?? null,
-            foto_url: fotoUrl,
-            operacion: p.operacion,
-            tipo: p.tipo,
-          } satisfies PropPreview
+      for (const id of ids) {
+        const p = propiedades.find((pr) => pr.id === id)
+        if (!p) continue
+        const fotos = (p.fotos_propiedad ?? []) as { url: string; es_principal: boolean; orden: number }[]
+        const sorted = [...fotos].sort((a, b) => a.orden - b.orden)
+        const fotoUrl = fotos.find((f) => f.es_principal)?.url ?? sorted[0]?.url ?? null
+        propsPreviews.push({
+          id: p.id,
+          titulo: p.titulo,
+          precio: formatPrecio(p),
+          zona: p.zona ?? p.direccion ?? null,
+          foto_url: fotoUrl,
+          operacion: p.operacion,
+          tipo: p.tipo,
         })
-        .filter((p): p is PropPreview => p !== null)
+      }
     }
 
     // Guardar conversación y lead en background

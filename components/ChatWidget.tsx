@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import type { PropPreview } from '@/app/api/chat/route'
+import type { PropPreview } from '@/lib/types'
 
 type ExtendedMessage = {
   role: 'user' | 'assistant'

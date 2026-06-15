@@ -85,3 +85,13 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
 }
+
+export interface PropPreview {
+  id: string
+  titulo: string
+  precio: string
+  zona: string | null
+  foto_url: string | null
+  operacion: string
+  tipo: string
+}
