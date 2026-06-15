@@ -1,5 +1,5 @@
 import { createServiceRoleClient } from '@/lib/supabase-server'
-import PropCard from '@/components/PropCard'
+import CatalogoConFiltros from '@/components/CatalogoConFiltros'
 import ChatWidget from '@/components/ChatWidget'
 import MagneticVideo from '@/components/MagneticVideo'
 import StatsSection from '@/components/sections/StatsSection'
@@ -194,39 +194,7 @@ export default async function LandingPage() {
       {/* Propiedades */}
       <section id="propiedades" className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
-            <div>
-              <p className="text-dorado text-sm font-semibold uppercase tracking-widest mb-2">Catálogo</p>
-              <h2 className="font-playfair text-3xl md:text-4xl font-bold text-oscuro">
-                Propiedades disponibles
-              </h2>
-            </div>
-            {total > 0 && (
-              <p className="text-oscuro/50 text-sm shrink-0">
-                {total} propiedad{total !== 1 ? 'es' : ''} activa{total !== 1 ? 's' : ''}
-              </p>
-            )}
-          </div>
-
-          {destacadas.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {destacadas.map((prop) => (
-                <PropCard key={prop.id} propiedad={prop} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-20 bg-white rounded-3xl border border-crema-dark">
-              <div className="w-16 h-16 bg-crema rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-dorado" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-              </div>
-              <h3 className="font-playfair text-xl font-semibold text-oscuro mb-2">Sin propiedades cargadas</h3>
-              <p className="text-oscuro/50 max-w-sm mx-auto text-sm">
-                Consultá con nuestro asistente virtual para conocer la disponibilidad.
-              </p>
-            </div>
-          )}
+          <CatalogoConFiltros propiedades={destacadas} total={total} />
 
           {/* CTA chatbot */}
           {total > 0 && (
