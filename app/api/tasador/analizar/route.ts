@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     const statusData = await statusRes.json()
     const status: string = statusData.data?.status ?? 'UNKNOWN'
 
-    if (status === 'RUNNING' || status === 'READY' || status === 'ABORTING') {
+    if (status === 'RUNNING' || status === 'READY' || status === 'ABORTING' || status === 'TIMING-OUT') {
       return NextResponse.json({ status: 'running' })
     }
 

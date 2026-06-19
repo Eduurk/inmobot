@@ -109,7 +109,7 @@ export default function TasadorForm() {
 
       // Paso 2: polling hasta que el run termine
       let intentos = 0
-      const maxIntentos = 40 // 40 × 3s = 2 min máximo
+      const maxIntentos = 80 // 80 × 3s = 4 min máximo
       let done = false
 
       while (!done && intentos < maxIntentos) {

@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
     }
 
-    const location = zona ? `${zona}, ${ciudad}` : ciudad
+    // Zonaprop busca mejor por ciudad sola — la zona la filtra Claude en el análisis
+    const location = ciudad
     const zonapropTipo = TIPO_MAP[tipo] ?? tipo
     const margin = Math.round(Number(metros) * 0.3)
 
