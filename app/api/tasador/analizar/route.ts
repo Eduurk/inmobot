@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
 const APIFY_TOKEN = process.env.APIFY_TOKEN
-const ACTOR_ID = 'solidcode~zonaprop-scraper'
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 interface ApifyItem {
@@ -31,9 +30,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Parámetros faltantes' }, { status: 400 })
     }
 
-    // Verificar estado del run en Apify
+    // Verificar estado usando el endpoint genérico (no depende del actorId)
     const statusRes = await fetch(
-      `https://api.apify.com/v2/acts/${ACTOR_ID}/runs/${runId}`,
+      `https://api.apify.com/v2/actor-runs/${runId}`,
       { headers: { Authorization: `Bearer ${APIFY_TOKEN}` } }
     )
     const statusData = await statusRes.json()

@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const APIFY_TOKEN = process.env.APIFY_TOKEN
-const ACTOR_ID = 'solidcode~zonaprop-scraper'
+const ACTOR_ID = 'ocrad~zonaprop-property-scraper'
 
-const TIPO_MAP: Record<string, string> = {
-  casa: 'casa',
-  departamento: 'departamento',
+// Slug para URL de Zonaprop: casas-venta-necochea.html
+const TIPO_SLUG: Record<string, string> = {
+  casa: 'casas',
+  departamento: 'departamentos',
   ph: 'ph',
-  lote: 'terreno',
-  local: 'local',
-  campo: 'galpon',
+  lote: 'terrenos',
+  local: 'locales',
+  campo: 'campos',
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
 }
 
 export async function POST(req: NextRequest) {
@@ -19,25 +29,22 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { tipo, operacion, ciudad, zona, metros, dormitorios } = body
+    const { tipo, operacion, ciudad } = body
 
-    if (!tipo || !ciudad || !metros) {
+    if (!tipo || !ciudad) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
     }
 
-    // Zonaprop busca mejor por ciudad sola — la zona la filtra Claude en el análisis
-    const location = ciudad
-    const zonapropTipo = TIPO_MAP[tipo] ?? tipo
-    const margin = Math.round(Number(metros) * 0.3)
+    const tipoSlug = TIPO_SLUG[tipo] ?? `${tipo}s`
+    const opSlug = operacion === 'alquiler' ? 'alquiler' : 'venta'
+    const ciudadSlug = slugify(ciudad)
+
+    // URL directa de Zonaprop — más confiable que keyword search
+    const zonapropUrl = `https://www.zonaprop.com.ar/${tipoSlug}-${opSlug}-${ciudadSlug}.html`
 
     const input = {
-      location,
-      transactionType: operacion === 'alquiler' ? 'alquiler' : 'venta',
-      propertyTypes: [zonapropTipo],
-      coveredAreaMin: Math.max(1, Number(metros) - margin),
-      coveredAreaMax: Number(metros) + margin,
-      ...(dormitorios ? { bedroomsMin: Math.max(1, Number(dormitorios) - 1) } : {}),
-      maxResults: 15,
+      urls: [{ url: zonapropUrl }],
+      max_items_per_url: 15,
     }
 
     const res = await fetch(
@@ -62,7 +69,7 @@ export async function POST(req: NextRequest) {
     const runId: string = data.data.id
     const datasetId: string = data.data.defaultDatasetId
 
-    return NextResponse.json({ runId, datasetId })
+    return NextResponse.json({ runId, datasetId, zonapropUrl })
   } catch (error) {
     console.error('Tasador start error:', error)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
