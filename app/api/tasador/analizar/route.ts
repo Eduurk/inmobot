@@ -44,7 +44,10 @@ export async function POST(req: NextRequest) {
     if (itemsRes.ok) {
       const items = await itemsRes.json()
       if (Array.isArray(items) && items.length > 0) {
-        markdownContent = items[0]?.markdown ?? ''
+        const fullMarkdown: string = items[0]?.markdown ?? ''
+        // Las propiedades con precios empiezan después del menú de navegación (~4500 chars)
+        // Tomamos desde ahí hasta 10000 chars para capturar los listados reales
+        markdownContent = fullMarkdown.slice(4500, 12000)
       }
     }
 
@@ -56,9 +59,9 @@ export async function POST(req: NextRequest) {
 }
 
 async function analizarConMarkdown(form: Record<string, string>, markdown: string) {
-  // Tomar solo los primeros 3000 chars del markdown para no exceder tokens
-  const extracto = markdown.slice(0, 3000)
-  const tieneComparables = extracto.length > 200
+  // El markdown ya viene pre-recortado desde los listados reales
+  const extracto = markdown.slice(0, 4000)
+  const tieneComparables = extracto.includes('USD') || extracto.includes('ARS')
 
   const prompt = `Sos un tasador inmobiliario experto en el mercado argentino, especializado en ${form.ciudad}.
 
