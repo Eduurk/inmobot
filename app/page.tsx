@@ -67,6 +67,7 @@ export default async function LandingPage() {
 
           <nav className="hidden md:flex items-center gap-6">
             <a href="#propiedades" className="text-crema/70 hover:text-dorado text-sm transition-colors">Propiedades</a>
+            <a href="/tasador" className="text-crema/70 hover:text-dorado text-sm transition-colors">Tasador IA</a>
             <a href="#nosotros" className="text-crema/70 hover:text-dorado text-sm transition-colors">Nosotros</a>
             <a href="#contacto" className="text-crema/70 hover:text-dorado text-sm transition-colors">Contacto</a>
           </nav>
@@ -223,6 +224,32 @@ export default async function LandingPage() {
 
       {/* Features / Por qué elegirnos */}
       <FeaturesSection />
+
+      {/* Banner Tasador IA */}
+      <section className="bg-crema py-10 px-4 sm:px-6">
+        <div className="max-w-4xl mx-auto">
+          <a
+            href="/tasador"
+            className="group flex flex-col sm:flex-row items-center justify-between gap-6 bg-oscuro rounded-3xl px-8 py-7 hover:bg-oscuro/90 transition-all"
+          >
+            <div>
+              <p className="text-dorado text-xs font-semibold uppercase tracking-widest mb-1">Nuevo</p>
+              <h3 className="font-playfair text-xl md:text-2xl font-bold text-crema mb-1">
+                Tasador IA gratuito
+              </h3>
+              <p className="text-crema/50 text-sm">
+                ¿Querés saber cuánto vale tu propiedad? Compará con precios reales de Zonaprop al instante.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 bg-dorado text-oscuro px-6 py-3 rounded-full font-bold text-sm shrink-0 group-hover:bg-dorado-light transition-colors">
+              Tasar mi propiedad
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </a>
+        </div>
+      </section>
 
       {/* Nosotros */}
       <section id="nosotros" className="bg-oscuro text-crema">
