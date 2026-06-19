@@ -4,24 +4,6 @@ import Anthropic from '@anthropic-ai/sdk'
 const APIFY_TOKEN = process.env.APIFY_TOKEN
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-interface ApifyItem {
-  title?: string
-  propertyType?: string
-  coveredArea?: number
-  totalArea?: number
-  address?: string
-  location?: string
-  priceUsd?: number
-  priceArs?: number
-  url?: string
-}
-
-function formatPrecioComparable(item: ApifyItem): string {
-  if (item.priceUsd) return `USD ${item.priceUsd.toLocaleString('es-AR')}`
-  if (item.priceArs) return `ARS ${item.priceArs.toLocaleString('es-AR')}`
-  return 'Sin precio'
-}
-
 export async function POST(req: NextRequest) {
   try {
     const { runId, datasetId, form } = await req.json()
@@ -30,51 +12,55 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Parámetros faltantes' }, { status: 400 })
     }
 
-    // Verificar estado usando el endpoint genérico (no depende del actorId)
+    // Verificar estado del run
     const statusRes = await fetch(
       `https://api.apify.com/v2/actor-runs/${runId}`,
       { headers: { Authorization: `Bearer ${APIFY_TOKEN}` } }
     )
-    const statusData = await statusRes.json()
-    const status: string = statusData.data?.status ?? 'UNKNOWN'
 
-    if (status === 'RUNNING' || status === 'READY' || status === 'ABORTING' || status === 'TIMING-OUT') {
+    if (!statusRes.ok) {
       return NextResponse.json({ status: 'running' })
     }
 
-    if (status === 'ABORTED' || status === 'TIMED-OUT' || status === 'FAILED') {
-      return NextResponse.json({ status: 'failed', error: 'El scraping no pudo completarse' })
+    const statusData = await statusRes.json()
+    const status: string = statusData.data?.status ?? 'UNKNOWN'
+
+    if (['RUNNING', 'READY', 'ABORTING', 'TIMING-OUT'].includes(status)) {
+      return NextResponse.json({ status: 'running' })
     }
 
-    // Run terminó con SUCCEEDED — traer items
+    if (['ABORTED', 'TIMED-OUT', 'FAILED'].includes(status)) {
+      // En vez de fallar, seguimos con análisis sin datos de Zonaprop
+      return analizarSinComparables(form)
+    }
+
+    // SUCCEEDED — traer markdown del dataset
     const itemsRes = await fetch(
-      `https://api.apify.com/v2/datasets/${datasetId}/items?limit=15`,
+      `https://api.apify.com/v2/datasets/${datasetId}/items?limit=1`,
       { headers: { Authorization: `Bearer ${APIFY_TOKEN}` } }
     )
-    const items: ApifyItem[] = await itemsRes.json()
 
-    if (!Array.isArray(items) || items.length === 0) {
-      // Sin comparables: Claude estima igual con info de mercado general
-      return NextResponse.json({
-        status: 'done',
-        valuacion: null,
-        comparables: [],
-        sinDatos: true,
-      })
+    let markdownContent = ''
+    if (itemsRes.ok) {
+      const items = await itemsRes.json()
+      if (Array.isArray(items) && items.length > 0) {
+        markdownContent = items[0]?.markdown ?? ''
+      }
     }
 
-    // Armar texto de comparables para Claude
-    const comparablesTexto = items
-      .slice(0, 12)
-      .map((p, i) => {
-        const precio = formatPrecioComparable(p)
-        const m2 = p.coveredArea ?? p.totalArea
-        const zona = p.address ?? p.location ?? ''
-        return `${i + 1}. ${p.propertyType ?? ''} ${m2 ? m2 + 'm²' : ''} — ${zona} — ${precio}`
-      })
-      .join('\n')
+    return analizarConMarkdown(form, markdownContent)
+  } catch (error) {
+    console.error('Tasador analizar error:', error)
+    return NextResponse.json({ error: 'Error al analizar' }, { status: 500 })
+  }
+}
 
-    const prompt = `Sos un tasador inmobiliario experto en el mercado argentino, especializado en ${form.ciudad}.
+async function analizarConMarkdown(form: Record<string, string>, markdown: string) {
+  // Tomar solo los primeros 3000 chars del markdown para no exceder tokens
+  const extracto = markdown.slice(0, 3000)
+  const tieneComparables = extracto.length > 200
+
+  const prompt = `Sos un tasador inmobiliario experto en el mercado argentino, especializado en ${form.ciudad}.
 
 PROPIEDAD A TASAR:
 - Tipo: ${form.tipo}
@@ -85,10 +71,11 @@ ${form.ambientes ? `- Ambientes: ${form.ambientes}` : ''}
 ${form.dormitorios ? `- Dormitorios: ${form.dormitorios}` : ''}
 ${form.estado ? `- Estado: ${form.estado}` : ''}
 
-PROPIEDADES COMPARABLES ACTUALES EN ZONAPROP (zona similar, m² similares):
-${comparablesTexto}
+${tieneComparables ? `DATOS DE ZONAPROP (página de búsqueda):
+${extracto}
 
-Analizá los comparables y calculá la tasación. Considerá estado del mercado, m² y ubicación.
+Analizá las propiedades que aparecen en esa página y compará con la propiedad a tasar.` : `No hay datos en tiempo real de Zonaprop para esta búsqueda. Usá tu conocimiento del mercado inmobiliario de ${form.ciudad} para hacer la tasación.`}
+
 Respondé ÚNICAMENTE con JSON válido, sin texto adicional:
 {
   "precio_min": 85000,
@@ -102,30 +89,30 @@ Respondé ÚNICAMENTE con JSON válido, sin texto adicional:
   "confianza": "alta"
 }`
 
-    const aiRes = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 600,
-      messages: [{ role: 'user', content: prompt }],
-    })
+  const aiRes = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 600,
+    messages: [{ role: 'user', content: prompt }],
+  })
 
-    const rawText = aiRes.content[0].type === 'text' ? aiRes.content[0].text : '{}'
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/)
-    let valuacion = null
-    if (jsonMatch) {
-      try { valuacion = JSON.parse(jsonMatch[0]) } catch { valuacion = null }
-    }
-
-    const comparables = items.slice(0, 5).map((p) => ({
-      titulo: p.title ?? `${p.propertyType ?? ''} en ${p.address ?? p.location ?? ''}`,
-      precio: formatPrecioComparable(p),
-      metros: p.coveredArea ?? p.totalArea ?? null,
-      zona: p.address ?? p.location ?? '',
-      url: p.url ?? null,
-    }))
-
-    return NextResponse.json({ status: 'done', valuacion, comparables })
-  } catch (error) {
-    console.error('Tasador analizar error:', error)
-    return NextResponse.json({ error: 'Error al analizar' }, { status: 500 })
+  const rawText = aiRes.content[0].type === 'text' ? aiRes.content[0].text : '{}'
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+  let valuacion = null
+  if (jsonMatch) {
+    try { valuacion = JSON.parse(jsonMatch[0]) } catch { valuacion = null }
   }
+
+  // Extraer comparables del markdown si hay
+  const comparables: { titulo: string; precio: string; metros: string | null; zona: string; url: string | null }[] = []
+
+  return NextResponse.json({
+    status: 'done',
+    valuacion,
+    comparables,
+    sinDatos: !tieneComparables,
+  })
+}
+
+async function analizarSinComparables(form: Record<string, string>) {
+  return analizarConMarkdown(form, '')
 }
