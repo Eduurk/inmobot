@@ -125,6 +125,9 @@ export async function POST(req: NextRequest) {
             .join('\n')
         : 'Sin propiedades disponibles.'
 
+    const hoy = new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    const hoyISO = new Date().toISOString().split('T')[0]
+
     const systemPrompt = `Sos el asistente de ventas de ${inmo.nombre}, inmobiliaria en ${inmo.ciudad}. ${inmo.chatbot_prompt_extra || ''}
 
 PROPIEDADES DISPONIBLES (cada una tiene un ID único):
@@ -142,13 +145,24 @@ CUÁNDO MOSTRAR PROPIEDADES:
 - Cuando el usuario dé pistas de qué busca → sugerí las que mejor encajan
 - Al inicio si el usuario dice "qué tienen" → mostrá las destacadas
 
+AGENDAR VISITAS:
+Hoy es ${hoy} (${hoyISO}).
+Cuando el usuario quiera visitar una propiedad:
+1. Si no tenés su nombre y teléfono todavía, pedíselos junto con el día y hora que prefiere.
+2. Si ya tenés nombre, teléfono Y acordaron una fecha y hora, confirmale la visita y agregá AL FINAL este tag (invisible para el usuario):
+   [VISITA:YYYY-MM-DD|HH:MM|propiedad_id]
+   - Convertí fechas relativas a YYYY-MM-DD usando la fecha de hoy como referencia
+   - Si no especificó hora exacta usá 10:00 como default y preguntale si le viene bien
+   - propiedad_id: ID exacto de la propiedad, o "none" si no especificó
+   - Ejemplo: [VISITA:2026-06-25|10:00|abc-123]
+3. No uses el tag si falta nombre, teléfono, o fecha.
+
 TONO Y VENTAS:
 - Español rioplatense, cercano y profesional
 - Máximo 2-3 oraciones de texto (las fotos hablan solas)
 - Destacá el beneficio principal: vista al mar, pileta, ubicación, precio
 - Creá urgencia genuina cuando aplique: "esta propiedad tiene varias consultas esta semana"
 - Si el usuario muestra interés, preguntá de forma natural: presupuesto, plazo, si necesita crédito
-- Si pide visita, pedí nombre y teléfono
 - Derivá casos complejos al WhatsApp`
 
     const response = await anthropic.messages.create({
@@ -163,9 +177,10 @@ TONO Y VENTAS:
 
     const rawReply = response.content[0].type === 'text' ? response.content[0].text : ''
 
-    // Parsear el tag [PROPS:id1,id2,...]
+    // Parsear tags [PROPS:...] y [VISITA:...]
     const propsTagMatch = rawReply.match(/\[PROPS:([\w,\-]+)\]/)
-    const reply = rawReply.replace(/\[PROPS:[^\]]+\]/g, '').trim()
+    const visitaTagMatch = rawReply.match(/\[VISITA:([\d-]+)\|([\d:]+)\|([\w-]+)\]/)
+    const reply = rawReply.replace(/\[PROPS:[^\]]+\]/g, '').replace(/\[VISITA:[^\]]+\]/g, '').trim()
 
     let propsPreviews: PropPreview[] = []
     if (propsTagMatch && propiedades) {
@@ -188,30 +203,35 @@ TONO Y VENTAS:
       }
     }
 
-    // Guardar conversación y lead en background
+    // Guardar conversación, lead y visita en background
     if (sessionId) {
       const fullMessages = [...messages, { role: 'assistant', content: reply }]
       const { nombre, telefono } = detectLead(messages)
       const tiene_lead = !!(nombre && telefono)
       const qualification = extractQualification(messages)
 
-      const saveConversation = supabase
-        .from('conversaciones')
-        .upsert(
-          { inmobiliaria_id: inmobiliariaId, session_id: sessionId, messages: fullMessages, tiene_lead, updated_at: new Date().toISOString() },
-          { onConflict: 'inmobiliaria_id,session_id' }
-        )
+      ;(async () => {
+        try {
+          await supabase
+            .from('conversaciones')
+            .upsert(
+              { inmobiliaria_id: inmobiliariaId, session_id: sessionId, messages: fullMessages, tiene_lead, updated_at: new Date().toISOString() },
+              { onConflict: 'inmobiliaria_id,session_id' }
+            )
 
-      const saveLead = tiene_lead
-        ? (async () => {
+          let leadId: string | null = null
+
+          if (tiene_lead) {
             const qualFields = Object.fromEntries(Object.entries(qualification).filter(([, v]) => v !== null))
             const consulta = messages.filter((m: Msg) => m.role === 'user').slice(-4).map((m: Msg) => m.content).join(' | ').slice(0, 500)
             const { data: existing } = await supabase.from('leads').select('id').eq('inmobiliaria_id', inmobiliariaId).eq('session_id', sessionId).single()
             if (existing) {
               await supabase.from('leads').update({ nombre, telefono, ...qualFields, consulta }).eq('id', existing.id)
+              leadId = existing.id
             } else {
               const { data: newLead } = await supabase.from('leads').insert({ inmobiliaria_id: inmobiliariaId, session_id: sessionId, nombre, telefono, canal: 'chatbot', consulta, ...qualFields }).select('id').single()
               if (newLead) {
+                leadId = newLead.id
                 await supabase.from('conversaciones').update({ lead_id: newLead.id }).eq('inmobiliaria_id', inmobiliariaId).eq('session_id', sessionId)
                 notifyNewLead({
                   inmoNombre: inmo.nombre,
@@ -223,10 +243,38 @@ TONO Y VENTAS:
                 }).catch(console.error)
               }
             }
-          })()
-        : Promise.resolve()
+          }
 
-      Promise.all([saveConversation, saveLead]).catch(console.error)
+          // Crear visita si Claude detectó fecha + hora + acordó con el usuario
+          if (visitaTagMatch) {
+            const [, fecha, hora, propId] = visitaTagMatch
+            const fecha_hora = `${fecha}T${hora}:00`
+            const propiedad_id = propId && propId !== 'none' ? propId : null
+
+            // Verificar que no exista ya una visita para esta sesión con la misma fecha
+            const { data: existingVisita } = await supabase
+              .from('visitas')
+              .select('id')
+              .eq('inmobiliaria_id', inmobiliariaId)
+              .eq('lead_id', leadId ?? '')
+              .eq('fecha_hora', fecha_hora)
+              .maybeSingle()
+
+            if (!existingVisita) {
+              await supabase.from('visitas').insert({
+                inmobiliaria_id: inmobiliariaId,
+                lead_id: leadId,
+                propiedad_id,
+                fecha_hora,
+                estado: 'pendiente',
+                notas: 'Agendada por chatbot',
+              })
+            }
+          }
+        } catch (e) {
+          console.error('Background save error:', e)
+        }
+      })()
     }
 
     return NextResponse.json({ reply, propiedades: propsPreviews })
