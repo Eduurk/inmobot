@@ -128,6 +128,17 @@ export async function POST(req: NextRequest) {
     const hoy = new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
     const hoyISO = new Date().toISOString().split('T')[0]
 
+    // Formatear horarios para el system prompt
+    const DIAS_ES: Record<string, string> = {
+      lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles',
+      jueves: 'Jueves', viernes: 'Viernes', sabado: 'Sábado', domingo: 'Domingo',
+    }
+    const horariosTexto = inmo.horarios
+      ? Object.entries(inmo.horarios as Record<string, { activo: boolean; inicio: string; fin: string }>)
+          .map(([dia, h]) => `  - ${DIAS_ES[dia] ?? dia}: ${h.activo ? `${h.inicio} a ${h.fin}` : 'Cerrado'}`)
+          .join('\n')
+      : '  - Lunes a Viernes: 09:00 a 18:00'
+
     const systemPrompt = `Sos el asistente de ventas de ${inmo.nombre}, inmobiliaria en ${inmo.ciudad}. ${inmo.chatbot_prompt_extra || ''}
 
 PROPIEDADES DISPONIBLES (cada una tiene un ID único):
@@ -145,17 +156,21 @@ CUÁNDO MOSTRAR PROPIEDADES:
 - Cuando el usuario dé pistas de qué busca → sugerí las que mejor encajan
 - Al inicio si el usuario dice "qué tienen" → mostrá las destacadas
 
+HORARIOS DE ATENCIÓN:
+${horariosTexto}
+
 AGENDAR VISITAS:
 Hoy es ${hoy} (${hoyISO}).
 Cuando el usuario quiera visitar una propiedad:
 1. Si no tenés su nombre y teléfono todavía, pedíselos junto con el día y hora que prefiere.
-2. Si ya tenés nombre, teléfono Y acordaron una fecha y hora, confirmale la visita y agregá AL FINAL este tag (invisible para el usuario):
+2. Verificá que la fecha y hora propuesta caiga dentro de los horarios de atención. Si no, sugerí el horario disponible más cercano.
+3. Si ya tenés nombre, teléfono Y acordaron una fecha y hora válida, confirmale la visita y agregá AL FINAL este tag (invisible para el usuario):
    [VISITA:YYYY-MM-DD|HH:MM|propiedad_id]
    - Convertí fechas relativas a YYYY-MM-DD usando la fecha de hoy como referencia
-   - Si no especificó hora exacta usá 10:00 como default y preguntale si le viene bien
+   - Si no especificó hora exacta, sugerí el horario de apertura del día elegido
    - propiedad_id: ID exacto de la propiedad, o "none" si no especificó
    - Ejemplo: [VISITA:2026-06-25|10:00|abc-123]
-3. No uses el tag si falta nombre, teléfono, o fecha.
+4. No uses el tag si falta nombre, teléfono, o fecha.
 
 TONO Y VENTAS:
 - Español rioplatense, cercano y profesional

@@ -14,6 +14,29 @@ interface FormData {
   logo_url: string
 }
 
+type DiaHorario = { activo: boolean; inicio: string; fin: string }
+type Horarios = Record<string, DiaHorario>
+
+const DIAS = [
+  { key: 'lunes',     label: 'Lunes' },
+  { key: 'martes',    label: 'Martes' },
+  { key: 'miercoles', label: 'Miércoles' },
+  { key: 'jueves',    label: 'Jueves' },
+  { key: 'viernes',   label: 'Viernes' },
+  { key: 'sabado',    label: 'Sábado' },
+  { key: 'domingo',   label: 'Domingo' },
+]
+
+const DEFAULT_HORARIOS: Horarios = {
+  lunes:     { activo: true,  inicio: '09:00', fin: '18:00' },
+  martes:    { activo: true,  inicio: '09:00', fin: '18:00' },
+  miercoles: { activo: true,  inicio: '09:00', fin: '18:00' },
+  jueves:    { activo: true,  inicio: '09:00', fin: '18:00' },
+  viernes:   { activo: true,  inicio: '09:00', fin: '18:00' },
+  sabado:    { activo: false, inicio: '09:00', fin: '13:00' },
+  domingo:   { activo: false, inicio: '09:00', fin: '13:00' },
+}
+
 function Field({
   label, hint, children,
 }: {
@@ -38,6 +61,7 @@ export default function NegocioPage() {
     nombre: '', descripcion: '', ciudad: '',
     whatsapp: '', telefono: '', email: '', direccion: '', logo_url: '',
   })
+  const [horarios, setHorarios] = useState<Horarios>(DEFAULT_HORARIOS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -62,6 +86,9 @@ export default function NegocioPage() {
             direccion: data.direccion ?? '',
             logo_url: data.logo_url ?? '',
           })
+          if (data.horarios) {
+            setHorarios({ ...DEFAULT_HORARIOS, ...data.horarios })
+          }
         }
         setLoading(false)
       })
@@ -70,6 +97,13 @@ export default function NegocioPage() {
   const set = (field: keyof FormData) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => setForm((prev) => ({ ...prev, [field]: e.target.value }))
+
+  const setHorario = (dia: string, campo: keyof DiaHorario, valor: string | boolean) => {
+    setHorarios(prev => ({
+      ...prev,
+      [dia]: { ...prev[dia], [campo]: valor },
+    }))
+  }
 
   const handleSave = async () => {
     if (!inmobiliariaId) return
@@ -86,6 +120,7 @@ export default function NegocioPage() {
         email: form.email.trim() || null,
         direccion: form.direccion.trim() || null,
         logo_url: form.logo_url.trim() || null,
+        horarios,
       })
       .eq('id', inmobiliariaId)
     setSaving(false)
@@ -210,6 +245,58 @@ export default function NegocioPage() {
               className={inputClass}
             />
           </Field>
+        </div>
+
+        {/* Horarios de atención */}
+        <div className="bg-white border border-crema-dark rounded-2xl p-6 space-y-4">
+          <div>
+            <h2 className="font-semibold text-oscuro">Horarios de atención</h2>
+            <p className="text-xs text-oscuro/40 mt-0.5">El chatbot solo agendará visitas dentro de estos horarios</p>
+          </div>
+
+          <div className="space-y-2">
+            {DIAS.map(({ key, label }) => {
+              const dia = horarios[key]
+              return (
+                <div key={key} className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${dia.activo ? 'bg-crema/40' : 'bg-crema/10'}`}>
+                  {/* Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setHorario(key, 'activo', !dia.activo)}
+                    className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${dia.activo ? 'bg-dorado' : 'bg-crema-dark'}`}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${dia.activo ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </button>
+
+                  {/* Día */}
+                  <span className={`w-24 text-sm font-medium shrink-0 ${dia.activo ? 'text-oscuro' : 'text-oscuro/40'}`}>
+                    {label}
+                  </span>
+
+                  {/* Horario */}
+                  {dia.activo ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="time"
+                        value={dia.inicio}
+                        onChange={e => setHorario(key, 'inicio', e.target.value)}
+                        className="border border-crema-dark rounded-lg px-2 py-1 text-sm text-oscuro focus:outline-none focus:border-dorado bg-white"
+                      />
+                      <span className="text-oscuro/40 text-sm">a</span>
+                      <input
+                        type="time"
+                        value={dia.fin}
+                        onChange={e => setHorario(key, 'fin', e.target.value)}
+                        className="border border-crema-dark rounded-lg px-2 py-1 text-sm text-oscuro focus:outline-none focus:border-dorado bg-white"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-sm text-oscuro/30">Cerrado</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         {/* Preview rápida */}
